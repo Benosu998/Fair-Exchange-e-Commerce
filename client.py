@@ -1,6 +1,7 @@
 import socket
 from Crypto.PublicKey import RSA
 import sec
+import pickle
 
 
 def generate_rsa_pair():
@@ -16,10 +17,26 @@ client_private, client_public = generate_rsa_pair()
 # Load Merchant Public Key
 merchant_public = RSA.import_key(open("receiver.pem").read())
 
+# SID & Sig(SID)
+SID = None
+Sig_SID = None
+
+
+def Setup(sock):
+    global SID
+    global Sig_SID
+    # Send Client public key to merchant
+    sock.send(sec.encrypt_data(client_public.export_key(), merchant_public))
+
+    # Read Sid + Sig(Sid) from merchant
+    data = pickle.loads(sec.decrypt_data(sock.recv(1024), client_private))
+    SID = data[0]
+    Sig_SID = data[1]
+
+
 if __name__ == "__main__":
     with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
         s.connect(("127.0.0.1", 1234))
-        s.send(sec.encrypt_data(client_public.export_key().decode(), merchant_public))
-        s.send(sec.encrypt_data("Hello Word", merchant_public))
-        data = s.recv(1024)
-        print(sec.decrypt_data(data, client_private))
+        Setup(s)
+        print(sec.checksign(SID,merchant_public,Sig_SID))
+        print("Client Finished")

@@ -1,9 +1,25 @@
 import socket
 import sec
 from Crypto.PublicKey import RSA
+from Crypto.Random import get_random_bytes
+import pickle
 
 client_public = None
 merchant_private = RSA.import_key(open("private.pem").read())
+Sid = get_random_bytes(16)
+
+
+# print(int(Sid.hex(),16))
+
+def Setup(socket_client):
+    global merchant_private
+    global client_public
+    data = socket_client.recv(1024)
+    client_public = RSA.import_key(sec.decrypt_data(data, merchant_private))
+
+    # Send to Client Sid+Sig(Sid)
+    data = [Sid, sec.sign(Sid, merchant_private)]
+    socket_client.send(sec.encrypt_data(pickle.dumps(data), client_public))
 
 
 if __name__ == "__main__":
@@ -13,14 +29,9 @@ if __name__ == "__main__":
 
         (connection, address) = s.accept()
 
-        print("Connected address:", address)
-        client_public = RSA.import_key(sec.decrypt_data(connection.recv(1024), merchant_private))
-        while True:
-            data = connection.recv(1024)
-            if not data:
-                break
-            print("Received: ", sec.decrypt_data(data, merchant_private))
-            connection.send(sec.encrypt_data("Hello Back", client_public))
-        connection.close()
+    print("Connected address:", address)
 
-        print("Server closed")
+    Setup(connection)
+
+    connection.close()
+    print("Server closed")

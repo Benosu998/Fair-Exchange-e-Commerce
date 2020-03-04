@@ -1,9 +1,10 @@
 from Crypto.Cipher import AES, PKCS1_OAEP
 from Crypto.Random import get_random_bytes
+from Crypto.Signature import PKCS1_PSS
+from Crypto.Hash import SHA256
 
 
 def encrypt_data(data, recipient_key):
-    data = data.encode()
     session_key = get_random_bytes(16)
 
     # Encrypt the session key with the public RSA key
@@ -33,4 +34,19 @@ def decrypt_data(enc_data, private_key):
     # Decrypt the data with the AES session key
     cipher_aes = AES.new(session_key, AES.MODE_EAX, nonce)
     ResultData = cipher_aes.decrypt_and_verify(ciphertext, tag)
-    return ResultData.decode("utf-8")
+    return ResultData
+
+
+def sign(data, private_key):
+    hasher = SHA256.new(data)
+    signer = PKCS1_PSS.new(private_key)
+    signature = signer.sign(hasher)
+    return signature
+
+
+def checksign(data, public_key, signature):
+    hasher = SHA256.new(data)
+    verifier = PKCS1_PSS.new(public_key)
+    return verifier.verify(hasher, signature)
+
+

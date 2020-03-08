@@ -39,6 +39,13 @@ def Exchange(socket_client, socket_PG):
         # 4. Send {PM,SigM{..}} to PG
         socket_PG.send(sec.encrypt_data(sendData, payment_gateway_public))
 
+        # 5. Recieve Response from PG
+        dataCr = socket_PG.recv(2048)
+        data = sec.decrypt_data(dataCr, merchant_private)
+
+        # 6. Send Response to CLinet
+        socket_client.send(sec.encrypt_data(data, client_public))
+
 
 if __name__ == "__main__":
     with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:

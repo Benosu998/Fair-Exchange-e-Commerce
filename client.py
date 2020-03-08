@@ -3,6 +3,7 @@ from Crypto.PublicKey import RSA
 from Crypto.Random import get_random_bytes
 import sec
 import pickle
+import time
 
 
 def generate_rsa_pair():
@@ -56,8 +57,35 @@ def Exchange(sock):
     # 3. Send {PM,PO}PubKM
     send_data = pickle.dumps((PM, PO))
     cyper = sec.encrypt_data(send_data, merchant_public)
-    print(len(cyper))
+
     sock.send(cyper)
+    st = time.time()
+    # 6. Recieve Response from Merchant
+    dataRecv = sock.recv(2048)
+    end = time.time() - st
+    # print(end)
+    if end > 0.03:
+        data = Resolution(True)
+    else:
+        Resolution(False)
+        data = sec.decrypt_data(dataRecv, client_private)
+    Response, sid, signuature = pickle.loads(data)
+    if sid == SID and sec.checksign(pickle.dumps([Response, SID, Amount, NC]), payment_gateway_public, signuature):
+        print("Raspuns tranzactie: ", Response)
+
+
+def Resolution(cond):
+    with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
+        s.connect(("127.0.0.1", 4411))
+        if not cond:
+            s.send(sec.encrypt_data(b"OK", payment_gateway_public))
+            return None
+        else:
+            signature = sec.sign(pickle.dumps([SID, Amount, NC, client_public.export_key()]), client_private)
+            message = pickle.dumps([SID, Amount, NC, client_public.export_key(), signature])
+            s.send(sec.encrypt_data(message, payment_gateway_public))
+            data = sec.decrypt_data(s.recv(2048), client_private)
+            return data
 
 
 if __name__ == "__main__":
@@ -65,5 +93,4 @@ if __name__ == "__main__":
         s.connect(("127.0.0.1", 1234))
         Setup(s)
         Exchange(s)
-        print(sec.checksign(SID, merchant_public, Sig_SID))
         print("Client Finished")
